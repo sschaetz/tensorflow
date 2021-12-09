@@ -1,0 +1,55 @@
+load(
+    "//tensorflow/lite:build_def.bzl",
+    "tflite_custom_cc_library",
+    "tflite_cc_shared_object",
+)
+
+tflite_custom_cc_library(
+    name = "selectively_built_cc_lib",
+    models = [],
+)
+
+# Shared lib target for convenience, pulls in the core runtime and builtin ops.
+# Note: This target is not yet finalized, and the exact set of exported (C/C++)
+# APIs is subject to change. The output library name is platform dependent:
+#   - Linux/Android: `libtensorflowlite.so`
+#   - Mac: `libtensorflowlite.dylib`
+#   - Windows: `tensorflowlite.dll`
+tflite_cc_shared_object(
+    name = "tensorflowlite",
+    # Until we have more granular symbol export for the C++ API on Windows,
+    # export all symbols.
+    features = ["windows_export_all_symbols"],
+    linkopts = select({
+        "//tensorflow:macos": [
+            "-Wl,-exported_symbols_list,$(location //tensorflow/lite:tflite_exported_symbols.lds)",
+        ],
+        "//tensorflow:windows": [],
+        "//conditions:default": [
+            "-Wl,-z,defs",
+            "-Wl,--version-script,$(location //tensorflow/lite:tflite_version_script.lds)",
+        ],
+    }),
+    per_os_targets = True,
+    deps = [
+        ":selectively_built_cc_lib",
+        "//tensorflow/lite:tflite_exported_symbols.lds",
+        "//tensorflow/lite:tflite_version_script.lds",
+    ],
+)
+
+load(
+    "//tensorflow/lite/delegates/flex:build_def.bzl",
+    "tflite_flex_shared_library"
+)
+
+# Shared lib target for convenience, pulls in the standard set of TensorFlow
+# ops and kernels. The output library name is platform dependent:
+#   - Linux/Android: `libtensorflowlite_flex.so`
+#   - Mac: `libtensorflowlite_flex.dylib`
+#   - Windows: `libtensorflowlite_flex.dll`
+tflite_flex_shared_library(
+  name = "tensorflowlite_flex",
+  models = [],
+)
+
